@@ -49,7 +49,7 @@ jobs:
       run: |
         # 创建 .env 文件（只写入非空的配置项）
         touch .env
-        
+
         # Cookie Cloud 配置（推荐）
         if [ -n "${{ secrets.CC_URL }}" ]; then
           echo 'CC_URL="${{ secrets.CC_URL }}"' >> .env
@@ -60,17 +60,17 @@ jobs:
         if [ -n "${{ secrets.CC_PASSWORD }}" ]; then
           echo 'CC_PASSWORD="${{ secrets.CC_PASSWORD }}"' >> .env
         fi
-        
+
         # 备用 Cookie（如果 Cookie Cloud 失败）
         if [ -n "${{ secrets.WEREAD_COOKIE }}" ]; then
           echo 'WEREAD_COOKIE="${{ secrets.WEREAD_COOKIE }}"' >> .env
         fi
-        
+
         # Flomo API（必需）
         if [ -n "${{ secrets.FLOMO_API }}" ]; then
           echo 'FLOMO_API="${{ secrets.FLOMO_API }}"' >> .env
         fi
-        
+
         # AI 配置（可选）
         if [ -n "${{ secrets.AI_API_KEY }}" ]; then
           echo 'AI_API_KEY="${{ secrets.AI_API_KEY }}"' >> .env
@@ -81,7 +81,7 @@ jobs:
         if [ -n "${{ secrets.AI_MODEL }}" ]; then
           echo 'AI_MODEL="${{ secrets.AI_MODEL }}"' >> .env
         fi
-        
+
         # 同步配置（使用输入参数或 secrets，优先使用输入参数）
         DAYS_LIMIT="${{ github.event.inputs.days_limit }}"
         if [ -z "$DAYS_LIMIT" ] && [ -n "${{ secrets.SYNC_DAYS_LIMIT }}" ]; then
@@ -90,7 +90,7 @@ jobs:
         if [ -n "$DAYS_LIMIT" ]; then
           echo "SYNC_DAYS_LIMIT=$DAYS_LIMIT" >> .env
         fi
-        
+
         MAX_HIGHLIGHTS="${{ github.event.inputs.max_highlights }}"
         if [ -z "$MAX_HIGHLIGHTS" ] && [ -n "${{ secrets.SYNC_MAX_HIGHLIGHTS }}" ]; then
           MAX_HIGHLIGHTS="${{ secrets.SYNC_MAX_HIGHLIGHTS }}"
@@ -98,10 +98,73 @@ jobs:
         if [ -n "$MAX_HIGHLIGHTS" ]; then
           echo "SYNC_MAX_HIGHLIGHTS=$MAX_HIGHLIGHTS" >> .env
         fi
-        
+
         echo "✅ 环境变量配置完成"
-        
+
+    - name: 验证 Cookie 有效性
+      id: cookie_check
+      run: |
+        echo "🔐 Cookie 预检"
+        echo "======================================================================"
+
+        # 运行预检并捕获结果
+        RESULT=$(python -c "
+import json
+from src.weread_api import validate_cookie
+
+result = validate_cookie()
+print(json.dumps(result, ensure_ascii=False))
+" 2>&1)
+
+        # 解析结果
+        VALID=$(echo "$RESULT" | tail -1 | python -c "import sys, json; print(json.loads(sys.stdin.read()).get('valid', False))")
+        BOOK_COUNT=$(echo "$RESULT" | tail -1 | python -c "import sys, json; print(json.loads(sys.stdin.read()).get('book_count', 0))")
+        COOKIE_SOURCE=$(echo "$RESULT" | tail -1 | python -c "import sys, json; print(json.loads(sys.stdin.read()).get('cookie_source', '未知'))")
+        ERROR_TYPE=$(echo "$RESULT" | tail -1 | python -c "import sys, json; print(json.loads(sys.stdin.read()).get('error_type', 'unknown'))")
+        ERROR_MSG=$(echo "$RESULT" | tail -1 | python -c "import sys, json; print(json.loads(sys.stdin.read()).get('error_msg', ''))")
+        SOLUTION=$(echo "$RESULT" | tail -1 | python -c "import sys, json; print(json.loads(sys.stdin.read()).get('solution', ''))")
+
+        # 输出预检结果
+        echo "   来源: $COOKIE_SOURCE"
+
+        if [ "$VALID" = "True" ]; then
+          echo "   状态: ✅ 有效"
+          echo "   书籍: $BOOK_COUNT 本"
+          echo "======================================================================"
+          echo ""
+          echo "cookie_valid=true" >> $GITHUB_OUTPUT
+        else
+          echo "   状态: ❌ 无效"
+          echo "   错误类型: $ERROR_TYPE"
+          echo "   错误信息: $ERROR_MSG"
+          echo ""
+          echo "💡 解决方案:"
+          echo "$SOLUTION" | sed 's/^/   /'
+          echo ""
+
+          # 根据错误类型提供文档链接
+          if [ "$ERROR_TYPE" = "cloud_fetch_failed" ]; then
+            echo "📚 参考文档: docs/COOKIE_CLOUD_GUIDE.md"
+          else
+            echo "📚 参考文档: docs/COOKIE_GUIDE.md"
+          fi
+          echo "======================================================================"
+          echo ""
+          echo "cookie_valid=false" >> $GITHUB_OUTPUT
+        fi
+
+        # 输出详细信息供后续步骤使用
+        echo "book_count=$BOOK_COUNT" >> $GITHUB_OUTPUT
+        echo "cookie_source=$COOKIE_SOURCE" >> $GITHUB_OUTPUT
+        echo "error_type=$ERROR_TYPE" >> $GITHUB_OUTPUT
+        echo "error_msg=$ERROR_MSG" >> $GITHUB_OUTPUT
+        # Solution 可能包含换行符，需要特殊处理
+        echo "solution<<EOF" >> $GITHUB_OUTPUT
+        echo "$SOLUTION" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
     - name: 运行同步
+      if: steps.cookie_check.outputs.cookie_valid == 'true'
       run: |
         echo "🚀 开始同步..."
         echo "⏰ 运行时间: $(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')"
@@ -145,7 +208,7 @@ jobs:
       run: |
         echo "# 📊 WeRead2Flomo 同步任务报告" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         # 基本信息
         echo "## 📅 基本信息" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -155,7 +218,40 @@ jobs:
         echo "| 触发方式 | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
         echo "| Workflow Run | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
+        # Cookie 预检结果
+        echo "## 🔐 Cookie 预检" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| 项目 | 值 |" >> $GITHUB_STEP_SUMMARY
+        echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+        echo "| Cookie 来源 | ${{ steps.cookie_check.outputs.cookie_source }} |" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.cookie_check.outputs.cookie_valid }}" = "true" ]; then
+          echo "| 状态 | ✅ 有效 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 书籍数量 | ${{ steps.cookie_check.outputs.book_count }} 本 |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| 状态 | ❌ 无效 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 错误类型 | ${{ steps.cookie_check.outputs.error_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 错误信息 | ${{ steps.cookie_check.outputs.error_msg }} |" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # 如果 Cookie 无效，显示解决方案
+        if [ "${{ steps.cookie_check.outputs.cookie_valid }}" != "true" ]; then
+          echo "### 💡 解决方案" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.cookie_check.outputs.solution }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.cookie_check.outputs.error_type }}" = "cloud_fetch_failed" ]; then
+            echo "📚 参考文档: [Cookie Cloud 配置指南](docs/COOKIE_CLOUD_GUIDE.md)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "📚 参考文档: [Cookie 获取指南](docs/COOKIE_GUIDE.md)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+
         # 提取配置信息
         if [ -f sync.log ]; then
           echo "## ⚙️ 配置详情" >> $GITHUB_STEP_SUMMARY
@@ -334,9 +430,94 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "---" >> $GITHUB_STEP_SUMMARY
         echo "*由 [WeRead2Flomo](https://github.com/${{ github.repository }}) 自动生成*" >> $GITHUB_STEP_SUMMARY
-        
+
+    - name: 创建 Cookie 过期通知
+      if: steps.cookie_check.outputs.cookie_valid == 'false' && github.event_name == 'schedule'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const cookieSource = '${{ steps.cookie_check.outputs.cookie_source }}';
+          const errorType = '${{ steps.cookie_check.outputs.error_type }}';
+          const errorMsg = '${{ steps.cookie_check.outputs.error_msg }}';
+          const solution = `${{ steps.cookie_check.outputs.solution }}`;
+
+          // 根据错误类型确定标题和文档链接
+          let title, docLink;
+          if (errorType === 'cloud_fetch_failed') {
+            title = `🔑 Cookie Cloud 连接失败 - ${new Date().toISOString().split('T')[0]}`;
+            docLink = 'docs/COOKIE_CLOUD_GUIDE.md';
+          } else if (errorType === 'cookie_expired') {
+            title = `🔑 Cookie 已过期 - ${new Date().toISOString().split('T')[0]}`;
+            docLink = 'docs/COOKIE_GUIDE.md';
+          } else if (errorType === 'not_configured') {
+            title = `🔑 Cookie 未配置 - ${new Date().toISOString().split('T')[0]}`;
+            docLink = 'docs/COOKIE_GUIDE.md';
+          } else {
+            title = `🔑 Cookie 验证失败 - ${new Date().toISOString().split('T')[0]}`;
+            docLink = 'docs/COOKIE_GUIDE.md';
+          }
+
+          const body = `## Cookie 验证失败
+
+**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+**Workflow Run**: [#${context.runNumber}](${context.payload.repository.html_url}/actions/runs/${context.runId})
+
+### 📋 错误详情
+
+| 项目 | 值 |
+| --- | --- |
+| Cookie 来源 | ${cookieSource} |
+| 错误类型 | ${errorType} |
+| 错误信息 | ${errorMsg} |
+
+### 💡 解决方案
+
+\`\`\`
+${solution}
+\`\`\`
+
+### 📚 参考文档
+
+- [${docLink}](${context.payload.repository.html_url}/blob/main/${docLink})
+
+---
+*此 Issue 由 GitHub Actions 自动创建（Cookie 预检失败）*`;
+
+          // 检查是否已有今天的 Cookie 过期 Issue
+          const today = new Date().toISOString().split('T')[0];
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            state: 'open',
+            labels: 'cookie-expired',
+            per_page: 5
+          });
+
+          const existingIssue = issues.data.find(issue =>
+            issue.title.includes(today)
+          );
+
+          if (existingIssue) {
+            // 更新现有 Issue
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existingIssue.number,
+              body: `再次检测到 Cookie 问题于 ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n${body}`
+            });
+          } else {
+            // 创建新 Issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['cookie-expired', 'auth-failure']
+            });
+          }
+
     - name: 创建失败通知 Issue
-      if: failure() && github.event_name == 'schedule'
+      if: failure() && github.event_name == 'schedule' && steps.cookie_check.outputs.cookie_valid == 'true'
       uses: actions/github-script@v7
       with:
         script: |
