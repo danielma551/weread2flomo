@@ -108,14 +108,7 @@ jobs:
         echo "======================================================================"
 
         # 运行预检并捕获结果
-        RESULT=$(python << 'PYTHON_SCRIPT'
-import json
-from src.weread_api import validate_cookie
-
-result = validate_cookie()
-print(json.dumps(result, ensure_ascii=False))
-PYTHON_SCRIPT
-2>&1)
+        RESULT=$(python scripts/validate_cookie_json.py 2>&1)
 
         # 解析结果
         VALID=$(echo "$RESULT" | tail -1 | python -c "import sys, json; print(json.loads(sys.stdin.read()).get('valid', False))")
