@@ -121,7 +121,28 @@ AI_API_KEY="你的AI API Key"
 > - [手动获取 Cookie](docs/COOKIE_GUIDE.md)（简单快速）
 > - [完整配置说明](docs/CONFIG_GUIDE.md)
 
-#### 4. 运行同步
+#### 4. 验证配置
+
+首次使用前，建议先验证 Cookie 配置是否有效：
+
+```bash
+# 验证 Cookie Cloud 和微信读书连接
+python tests/verify_cookie.py
+```
+
+**预期输出：**
+```
+✅ Cookie Cloud 返回成功
+   ✓ 包含 wr_skey
+✅ 成功获取 Cookie
+```
+
+如果显示 `❌ 缺少 wr_skey`，请检查：
+1. 浏览器是否已登录微信读书
+2. Cookie Cloud 插件是否点击了「立即同步」
+3. 插件服务器 SSL 证书是否正常（过期会导致上传失败）
+
+#### 5. 运行同步
 
 ```bash
 # 完整同步

@@ -432,7 +432,8 @@ def try_get_cloud_cookie(cc_url: str, cc_id: str, cc_password: str) -> Optional[
         response = requests.post(
             url,
             json={"password": cc_password},
-            timeout=10
+            timeout=10,
+            verify=False  # 跳过 SSL 验证（部分服务器证书过期）
         )
 
         if not response.ok:
@@ -551,6 +552,212 @@ def initialize_api() -> bool:
     except Exception as e:
         print(f"初始化失败: {e}")
         return False
+
+
+def validate_cookie() -> Dict:
+    """验证 Cookie 有效性（预检函数）
+
+    此函数用于在同步前验证 Cookie 是否有效，支持两种 Cookie 来源：
+    1. 环境变量 WEREAD_COOKIE
+    2. Cookie Cloud (CC_URL, CC_ID, CC_PASSWORD)
+
+    返回值:
+        Dict: 验证结果，包含以下字段：
+            - valid: bool, Cookie 是否有效
+            - book_count: int, 获取到的书籍数量
+            - cookie_source: str, Cookie 来源
+            - error_type: str, 错误类型
+            - error_code: int, API 错误码
+            - error_msg: str, 错误信息
+            - solution: str, 针对性解决方案
+    """
+    result = {
+        "valid": False,
+        "book_count": 0,
+        "cookie_source": "未配置",
+        "error_type": "none",
+        "error_code": 0,
+        "error_msg": "",
+        "solution": ""
+    }
+
+    # 检测 Cookie 来源
+    env_cookie = os.getenv("WEREAD_COOKIE")
+    cc_url = os.getenv("CC_URL")
+    cc_id = os.getenv("CC_ID")
+    cc_password = os.getenv("CC_PASSWORD")
+
+    has_env_cookie = bool(env_cookie and env_cookie.strip())
+    has_cookie_cloud = all([cc_url, cc_id, cc_password])
+
+    if has_env_cookie:
+        result["cookie_source"] = "WEREAD_COOKIE"
+    elif has_cookie_cloud:
+        result["cookie_source"] = "Cookie Cloud"
+    else:
+        result["error_type"] = "not_configured"
+        result["error_msg"] = "未配置任何 Cookie 来源"
+        result["solution"] = "请配置 WEREAD_COOKIE 环境变量，或配置 Cookie Cloud (CC_URL, CC_ID, CC_PASSWORD)"
+        return result
+
+    # 尝试获取 Cookie（对于 Cookie Cloud，这一步可能失败）
+    try:
+        if has_env_cookie:
+            cookie_string = env_cookie
+        else:
+            # Cookie Cloud 获取
+            cookie_string = try_get_cloud_cookie(cc_url, cc_id, cc_password)
+            if not cookie_string:
+                result["error_type"] = "cloud_fetch_failed"
+                result["error_msg"] = "Cookie Cloud 获取失败"
+                result["solution"] = (
+                    "请检查 Cookie Cloud 服务状态：\n"
+                    "   1. 确认服务地址 (CC_URL) 可访问\n"
+                    "   2. 确认 ID 和密码正确\n"
+                    "   3. 或改用 WEREAD_COOKIE 直接配置"
+                )
+                return result
+
+        # 初始化 session
+        init_session(cookie_string)
+
+    except requests.exceptions.SSLError as e:
+        result["error_type"] = "cloud_fetch_failed"
+        result["error_code"] = -1
+        result["error_msg"] = f"SSL 证书错误: {str(e)[:100]}"
+        result["solution"] = (
+            "Cookie Cloud 服务的 SSL 证书可能已过期：\n"
+            "   1. 联系服务提供者更新证书\n"
+            "   2. 或改用 WEREAD_COOKIE 直接配置"
+        )
+        return result
+    except requests.exceptions.ConnectionError as e:
+        result["error_type"] = "network_error"
+        result["error_code"] = -1
+        result["error_msg"] = "网络连接失败"
+        result["solution"] = "请检查网络连接，或稍后重试"
+        return result
+    except Exception as e:
+        result["error_type"] = "cloud_fetch_failed" if has_cookie_cloud and not has_env_cookie else "unknown"
+        result["error_code"] = -1
+        result["error_msg"] = str(e)[:200]
+        result["solution"] = "请检查配置是否正确"
+        return result
+
+    # 验证 Cookie 有效性：调用 API 获取书籍列表
+    try:
+        session = get_session()
+        params = {'_': int(time.time() * 1000)}
+        response = session.get(WEREAD_NOTEBOOKS_URL, params=params, timeout=30)
+
+        if response.ok:
+            data = response.json()
+
+            # 检查 API 错误码
+            if 'errCode' in data and data['errCode'] != 0:
+                result["error_type"] = "cookie_expired"
+                result["error_code"] = data.get('errCode', -1)
+                result["error_msg"] = data.get('errMsg', '鉴权失败')
+
+                if result["cookie_source"] == "WEREAD_COOKIE":
+                    result["solution"] = (
+                        "Cookie 已过期，请更新：\n"
+                        "   1. 登录微信读书网页版 (weread.qq.com)\n"
+                        "   2. 按 F12 打开开发者工具 → Network\n"
+                        "   3. 刷新页面，复制任意请求的 Cookie\n"
+                        "   4. 更新 GitHub Secrets 中的 WEREAD_COOKIE"
+                    )
+                else:
+                    result["solution"] = (
+                        "Cookie Cloud 中的 Cookie 已过期：\n"
+                        "   1. 在浏览器中登录微信读书网页版\n"
+                        "   2. 确保 Cookie Cloud 扩展已同步\n"
+                        "   3. 或改用 WEREAD_COOKIE 直接配置"
+                    )
+                return result
+
+            # 检查 errcode（小写，微信读书 API 的另一种格式）
+            if 'errcode' in data and data['errcode'] != 0:
+                result["error_type"] = "cookie_expired"
+                result["error_code"] = data.get('errcode', -1)
+                result["error_msg"] = data.get('errmsg', '鉴权失败')
+
+                if result["cookie_source"] == "WEREAD_COOKIE":
+                    result["solution"] = (
+                        "Cookie 已过期，请更新：\n"
+                        "   1. 登录微信读书网页版 (weread.qq.com)\n"
+                        "   2. 按 F12 打开开发者工具 → Network\n"
+                        "   3. 刷新页面，复制任意请求的 Cookie\n"
+                        "   4. 更新 GitHub Secrets 中的 WEREAD_COOKIE"
+                    )
+                else:
+                    result["solution"] = (
+                        "Cookie Cloud 中的 Cookie 已过期：\n"
+                        "   1. 在浏览器中登录微信读书网页版\n"
+                        "   2. 确保 Cookie Cloud 扩展已同步\n"
+                        "   3. 或改用 WEREAD_COOKIE 直接配置"
+                    )
+                return result
+
+            # 获取书籍数量
+            books = data.get("books", []) if isinstance(data, dict) else data if isinstance(data, list) else []
+            result["book_count"] = len(books)
+
+            if result["book_count"] > 0:
+                result["valid"] = True
+                result["error_type"] = "none"
+                result["error_msg"] = "Cookie 有效"
+            else:
+                # Cookie 有效但没有书籍（可能是新账号或未添加书籍）
+                result["valid"] = True
+                result["error_type"] = "none"
+                result["error_msg"] = "Cookie 有效，但未找到书籍"
+
+        else:
+            # HTTP 错误（如 401）
+            try:
+                error_data = response.json()
+                result["error_code"] = error_data.get('errcode', error_data.get('errCode', response.status_code))
+                result["error_msg"] = error_data.get('errmsg', error_data.get('errMsg', f'HTTP {response.status_code}'))
+            except:
+                result["error_code"] = response.status_code
+                result["error_msg"] = f"HTTP 请求失败: {response.status_code}"
+
+            result["error_type"] = "cookie_expired"
+
+            if result["cookie_source"] == "WEREAD_COOKIE":
+                result["solution"] = (
+                    "Cookie 已过期，请更新：\n"
+                    "   1. 登录微信读书网页版 (weread.qq.com)\n"
+                    "   2. 按 F12 打开开发者工具 → Network\n"
+                    "   3. 刷新页面，复制任意请求的 Cookie\n"
+                    "   4. 更新 GitHub Secrets 中的 WEREAD_COOKIE"
+                )
+            else:
+                result["solution"] = (
+                    "Cookie Cloud 中的 Cookie 已过期：\n"
+                    "   1. 在浏览器中登录微信读书网页版\n"
+                    "   2. 确保 Cookie Cloud 扩展已同步\n"
+                    "   3. 或改用 WEREAD_COOKIE 直接配置"
+                )
+
+    except requests.exceptions.Timeout:
+        result["error_type"] = "network_error"
+        result["error_code"] = -1
+        result["error_msg"] = "请求超时"
+        result["solution"] = "请检查网络连接，或稍后重试"
+    except requests.exceptions.ConnectionError:
+        result["error_type"] = "network_error"
+        result["error_code"] = -1
+        result["error_msg"] = "网络连接失败"
+        result["solution"] = "请检查网络连接，或稍后重试"
+    except Exception as e:
+        result["error_type"] = "unknown"
+        result["error_code"] = -1
+        result["error_msg"] = str(e)[:200]
+        result["solution"] = "请查看详细日志排查问题"
+
+    return result
 
 
 if __name__ == "__main__":
