@@ -46,6 +46,10 @@ FLOMO_API="粘贴你的flomo API地址"
 # 可选配置（如果需要AI标签）
 # AI_API_KEY="your_api_key"
 # AI_API_BASE="https://api.openai.com/v1"
+
+# 可选配置（Telegram 通知）
+# TELEGRAM_BOT_TOKEN="your_bot_token"
+# TELEGRAM_CHAT_ID="your_chat_id"
 ```
 
 ### 步骤4：安装依赖
@@ -56,61 +60,13 @@ pip install -r requirements.txt
 
 ### 步骤5：测试连接
 
-#### 测试1：配置文件
-```bash
-python config_manager.py
-```
-
-应该看到：
-```
-=== 配置管理器测试 ===
-
-天数限制: 7
-默认模板: simple
-启用AI标签: False
-...
-```
-
-#### 测试2：微信读书连接
-```bash
-python weread_api.py
-```
-
-应该看到：
-```
-获取到 X 本书
-
-书名: 《某本书》
-作者: 某作者
-划线数量: X
-```
-
-如果报错 "没有找到 Cookie"，检查 `.env` 文件配置。
-
-#### 测试3：flomo 连接（谨慎）
-```bash
-python flomo_client.py
-```
-
-这会向 flomo 发送一条测试笔记！如果不想测试可以跳过。
-
-### 步骤6：运行同步（小范围测试）
-
-首先，编辑 `config.yaml` 限制同步数量：
-
-```yaml
-sync:
-  days_limit: 1  # 只同步昨天的划线
-  max_highlights_per_sync: 5  # 最多5条
-```
-
-然后运行：
+运行同步（建议先在 `config.yaml` 中设置较小的同步量）：
 
 ```bash
 python sync.py
 ```
 
-### 步骤7：检查 flomo
+### 步骤6：检查 flomo
 
 打开 flomo App 或网页版，检查是否有新笔记！
 
@@ -183,10 +139,9 @@ pip install pyyaml
 
 完成以下测试表示配置成功：
 
-- [ ] 配置管理器测试通过
-- [ ] 微信读书 API 能获取书籍列表
-- [ ] flomo API 能发送测试笔记（可选）
-- [ ] 完整同步至少成功1条划线
+- [ ] `.env` 文件配置完成
+- [ ] `pip install -r requirements.txt` 安装成功
+- [ ] `python sync.py` 运行无报错
 - [ ] 在 flomo 中看到了同步的笔记
 
 ## 🎨 下一步
@@ -195,8 +150,9 @@ pip install pyyaml
 
 1. **调整模板**：编辑 `config.yaml` 选择喜欢的模板
 2. **启用 AI 标签**：配置 AI API 后设置 `enable_ai_tags: true`
-3. **自定义分类**：在 `book_categories` 添加自己的分类
-4. **部署自动化**：推送到 GitHub 启用 Actions
+3. **启用 Telegram 通知**：配置 Bot Token 和 Chat ID 接收同步报告
+4. **自定义分类**：在 `book_categories` 添加自己的分类
+5. **部署自动化**：推送到 GitHub 启用 [Actions](GITHUB_ACTIONS_GUIDE.md)
 
 ## 💡 使用技巧
 

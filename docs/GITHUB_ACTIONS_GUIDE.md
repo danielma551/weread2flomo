@@ -90,6 +90,9 @@ jobs:
         FLOMO_API: ${{ secrets.FLOMO_API }}
         # AI 配置（可选）
         AI_API_KEY: ${{ secrets.AI_API_KEY }}
+        # Telegram 通知（可选）
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
         python sync.py
         
@@ -134,6 +137,8 @@ jobs:
 | `WEREAD_COOKIE` | 手动获取微信读书 Cookie | ⭐ 备选 | `wr_vid=123...` |
 | `FLOMO_API` | Flomo 网站 → 设置 → API | ✅ 必需 | `https://flomoapp.com/iwh/...` |
 | `AI_API_KEY` | AI 服务商提供 | 可选 | `sk-...` |
+| `TELEGRAM_BOT_TOKEN` | [@BotFather](https://t.me/BotFather) 创建 Bot 获取 | 可选 | `123456:ABC-DEF...` |
+| `TELEGRAM_CHAT_ID` | [@userinfobot](https://t.me/userinfobot) 获取 | 可选 | `123456789` |
 
 **推荐配置方式**：
 
@@ -144,6 +149,8 @@ CC_ID="你的UUID"
 CC_PASSWORD="你的密码"
 FLOMO_API="你的Flomo API"
 AI_API_KEY="你的AI Key"（可选）
+TELEGRAM_BOT_TOKEN="你的Bot Token"（可选）
+TELEGRAM_CHAT_ID="你的Chat ID"（可选）
 ```
 
 **方案 B：手动 Cookie**
@@ -151,6 +158,8 @@ AI_API_KEY="你的AI Key"（可选）
 WEREAD_COOKIE="你的Cookie"
 FLOMO_API="你的Flomo API"
 AI_API_KEY="你的AI Key"（可选）
+TELEGRAM_BOT_TOKEN="你的Bot Token"（可选）
+TELEGRAM_CHAT_ID="你的Chat ID"（可选）
 ```
 
 > 💡 **提示**：Cookie Cloud 可以自动更新 Cookie，更方便！参考 [Cookie Cloud 配置指南](COOKIE_CLOUD_GUIDE.md)
@@ -334,6 +343,19 @@ AI_API_KEY="你的 AI API Key"
 ```
 
 其他配置在 `config.yaml` 中设置。
+
+### 启用 Telegram 通知
+
+添加 Telegram 相关的 Secrets：
+
+```
+TELEGRAM_BOT_TOKEN="你的 Bot Token"
+TELEGRAM_CHAT_ID="你的 Chat ID"
+```
+
+同时在 `config.yaml` 中设置 `notification.telegram.enabled: true`。
+
+获取方式：Telegram 搜索 [@BotFather](https://t.me/BotFather) 创建 Bot 获取 Token，搜索 [@userinfobot](https://t.me/userinfobot) 获取 Chat ID。
 
 ---
 

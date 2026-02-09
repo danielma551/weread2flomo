@@ -230,13 +230,33 @@ templates:
 - `{create_time}` - 创建时间
 - `{tags}` - 标签
 
+### Telegram 通知配置
+
+| 配置项 | 环境变量 | 默认值 | 说明 |
+|--------|----------|--------|------|
+| Bot Token | `TELEGRAM_BOT_TOKEN` | 无 | Telegram Bot 的 Token |
+| Chat ID | `TELEGRAM_CHAT_ID` | 无 | 接收通知的 Chat ID |
+| API 地址 | `TELEGRAM_API_BASE` | `https://api.telegram.org` | 可选，支持反代地址 |
+
+同时需要在 `config.yaml` 中启用通知：
+
+```yaml
+notification:
+  telegram:
+    enabled: true
+```
+
+获取方式：
+1. Telegram 搜索 [@BotFather](https://t.me/BotFather)，发送 `/newbot` 创建 Bot，获取 Token
+2. 搜索 [@userinfobot](https://t.me/userinfobot)，发送任意消息获取 Chat ID
+3. 向你创建的 Bot 发送一条消息（激活对话）
+
 ### 高级配置
 
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |--------|----------|--------|------|
 | 请求延迟 | `REQUEST_DELAY` | 1.0 | 请求之间的延迟（秒） |
 | 日志级别 | `LOG_LEVEL` | INFO | DEBUG, INFO, WARNING, ERROR |
-| 重试次数 | `MAX_RETRIES` | 3 | API失败时的重试次数 |
 
 示例：
 
@@ -362,5 +382,5 @@ LOG_LEVEL=DEBUG
 - [Cookie 获取指南](./COOKIE_GUIDE.md)
 - [Cookie Cloud 配置](./COOKIE_CLOUD_GUIDE.md)
 - [快速开始](./QUICKSTART.md)
-- [项目导航](./PROJECT_NAVIGATION.md)
+- [GitHub Actions 自动化](./GITHUB_ACTIONS_GUIDE.md)
 

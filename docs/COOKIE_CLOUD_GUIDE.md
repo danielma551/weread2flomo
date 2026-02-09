@@ -87,9 +87,9 @@ CC_PASSWORD="你的加密密码"
 
 ## ✅ 验证配置
 
-运行测试脚本：
+运行验证脚本：
 ```bash
-python3 diagnostic.py
+python tests/verify_cookie.py
 ```
 
 如果看到：
