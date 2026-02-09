@@ -266,7 +266,7 @@ notification:
   telegram:
     # 是否启用 Telegram 通知（true/false）
     # 即使设为 true，如果未配置 BOT_TOKEN 和 CHAT_ID 也会静默跳过
-    enabled: false
+    enabled: true
 
 # ==================== 高级选项 ====================
 
