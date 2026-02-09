@@ -62,6 +62,11 @@ class ConfigManager:
             'advanced': {
                 'request_delay': 1.0,
                 'log_level': 'INFO'
+            },
+            'notification': {
+                'telegram': {
+                    'enabled': False
+                }
             }
         }
 
@@ -262,6 +267,10 @@ class ConfigManager:
     def get_ai_summary_min_length(self) -> int:
         """获取AI摘要的最小文本长度"""
         return self.get('ai.summary_min_length', 100, env_key='AI_SUMMARY_MIN_LENGTH')
+
+    def should_enable_telegram(self) -> bool:
+        """是否启用 Telegram 通知"""
+        return self.get('notification.telegram.enabled', False, env_key='ENABLE_TELEGRAM')
 
 
 # 全局配置实例

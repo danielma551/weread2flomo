@@ -82,6 +82,14 @@ jobs:
           echo 'AI_MODEL="${{ secrets.AI_MODEL }}"' >> .env
         fi
 
+        # Telegram 通知（可选）
+        if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then
+          echo 'TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"' >> .env
+        fi
+        if [ -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+          echo 'TELEGRAM_CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"' >> .env
+        fi
+
         # 同步配置（使用输入参数或 secrets，优先使用输入参数）
         DAYS_LIMIT="${{ github.event.inputs.days_limit }}"
         if [ -z "$DAYS_LIMIT" ] && [ -n "${{ secrets.SYNC_DAYS_LIMIT }}" ]; then

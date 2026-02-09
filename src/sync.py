@@ -25,6 +25,7 @@ try:
     from .template_renderer import TemplateRenderer, TagGenerator
     from .ai_tags import AITagGenerator
     from .ai_summary import AISummaryGenerator
+    from .telegram_notifier import TelegramNotifier
 except ImportError:
     # 如果相对导入失败，使用绝对导入（直接运行）
     # 将项目根目录添加到 sys.path
@@ -42,6 +43,7 @@ except ImportError:
     from src.template_renderer import TemplateRenderer, TagGenerator
     from src.ai_tags import AITagGenerator
     from src.ai_summary import AISummaryGenerator
+    from src.telegram_notifier import TelegramNotifier
 
 
 class SyncStatistics:
@@ -111,6 +113,7 @@ class WeRead2FlomoV2:
         self.tag_generator = TagGenerator()
         self.ai_tag_generator = AITagGenerator()
         self.ai_summary_generator = AISummaryGenerator()
+        self.telegram_notifier = TelegramNotifier()
 
         self.synced_file = "synced_bookmarks.json"
         self.synced_ids = self.load_synced_ids()
@@ -160,6 +163,13 @@ class WeRead2FlomoV2:
         # Flomo 配置
         print(f"\n📤 Flomo 配置:")
         print(f"   - 每日限制: {self.flomo_client.daily_limit} 次")
+
+        # 通知配置
+        print(f"\n📬 通知配置:")
+        if self.telegram_notifier.is_enabled():
+            print(f"   - Telegram: ✅ 已启用")
+        else:
+            print(f"   - Telegram: 未配置（跳过）")
         
         print(f"\n{'='*70}\n")
 
@@ -469,6 +479,20 @@ class WeRead2FlomoV2:
 
         # 输出详细统计信息
         self._print_detailed_summary(total_synced, processed_books, len(books))
+
+        # 发送 Telegram 通知
+        if self.telegram_notifier.is_enabled():
+            try:
+                report = self.telegram_notifier.format_sync_report(
+                    stats=self.stats,
+                    total_synced=total_synced,
+                    processed_books=processed_books,
+                    total_books=len(books),
+                    total_synced_ids=len(self.synced_ids)
+                )
+                self.telegram_notifier.send_message(report)
+            except Exception as e:
+                print(f"⚠️  Telegram 通知发送失败: {e}")
 
     def _print_detailed_summary(self, total_synced: int, processed_books: int, total_books: int):
         """输出详细的同步摘要"""

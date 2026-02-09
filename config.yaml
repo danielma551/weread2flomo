@@ -257,6 +257,17 @@ ai:
 
     请概述：{highlight_text}
 
+# ==================== 通知配置 ====================
+# 注意：敏感信息（TELEGRAM_BOT_TOKEN）在 .env 文件或 GitHub Secrets 中配置
+
+notification:
+  # Telegram 通知（可选）
+  # 需要配置 TELEGRAM_BOT_TOKEN 和 TELEGRAM_CHAT_ID 环境变量
+  telegram:
+    # 是否启用 Telegram 通知（true/false）
+    # 即使设为 true，如果未配置 BOT_TOKEN 和 CHAT_ID 也会静默跳过
+    enabled: false
+
 # ==================== 高级选项 ====================
 
 advanced:
