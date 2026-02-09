@@ -16,7 +16,7 @@
 <summary><strong>📸 点击查看运行效果</strong></summary>
 <br/>
 <div align="center">
-  <img src="./assets/images/screenshot_1.jpg" alt="功能演示" width="800"/>
+  <img src="./assets/images/screenshot_1.jpg" alt="功能演示" width="560"/>
 </div>
 </details>
 
